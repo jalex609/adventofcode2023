@@ -52,10 +52,45 @@ function parseInputs() {
 }
 
 function findFinalLocation() {
-  const { map, seeds, seedsPartII } = parseInputs();
+  const { map, seeds } = parseInputs();
   const seedMap = seeds.map((seed) => goThroughMappings(seed, map));
   const min = Math.min(...seedMap.map((path) => path.location));
   console.log('Closest location for Part I is: ' + min);
+}
+
+function findFinalRanges() {
+  const { map, seedsPartII } = parseInputs();
+  const rangeMap = seedsPartII.map((seedRange) => calculateRanges(seedRange, map));
+  console.log('Data for Part II is: ' + rangeMap);
+}
+
+function calculateRanges(startingRange, map) {
+  const finalRanges = {
+    'seed': [startingRange]
+  };
+  let currentResource = 'seed';
+  while (currentResource) {
+    const nextResource = resourceList?.[resourceList.findIndex((val) => val === currentFromResource) + 1];
+    for (const currentRange of finalRanges[currentResource]) {
+      const overlappingRanges = map[currentResource].filter(({ fromRange, toRange }) => hasAnyRangeOverlap(currentRange, fromRange));
+      const toRanges = createNewToRanges(currentRange, overlappingRanges);
+      if (!finalRanges[nextResource]) {
+        finalRanges[nextResource] = [];
+      }
+      finalRanges[nextResource].push(...toRanges);
+    }
+    // go to next resource, undefined if go to final resource
+    currentResource = nextResource
+  }
+}
+
+function createNewToRanges(currentRange, overlappingWithCurrentRange) {
+  const newRangeObject = {
+    fromRange: currentRange,
+    toRange: currentRange,
+    difference: 0
+  };
+  // TODO finish this function
 }
 
 function goThroughMappings(seed, map) {
@@ -92,8 +127,10 @@ function withinRange(range, value) {
   return value >= range[0] && value <= range[1];
 }
 
-function rangeWithinRange(range1, range2) {
-  return range1[0] >= range2[0] && range1[1] <= range2[1];
+function hasAnyRangeOverlap(range1, range2) {
+  // Range 1 ends before Range 2 starts or Range 1 starts after range2 ends
+  // Negate that to get overlap
+  return !(range1[1] < range2[0] || range1[0] > range2[1])
 }
 
 function isStartOfMap(currentLine) {
