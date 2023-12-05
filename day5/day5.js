@@ -6,6 +6,7 @@ const resourceList = [ 'seed', 'soil', 'fertilizer', 'water', 'light', 'temperat
 
 function parseInputs() {
   let seeds;
+  const seedsPartII = [];
   const map = {
     'seed': {},
     'soil': {},
@@ -24,6 +25,11 @@ function parseInputs() {
     if (currentLine.startsWith('seeds:')) {
       const [, seedStrings] = currentLine.split(':');
       seeds = seedStrings.trim().split(/\s+/).map((i) => parseInt(i));
+      for (let pairIndex=0; pairIndex < seeds.length; pairIndex += 2) {
+        if (seeds[pairIndex] && seeds[pairIndex + 1]) {
+          seedsPartII.push([seeds[pairIndex], seeds[pairIndex] + seeds[pairIndex + 1]]);
+        }
+      }
     } else if (newFromTo) {
       currentFromResource = newFromTo.from;
       currentToResource = newFromTo.to;
@@ -42,11 +48,11 @@ function parseInputs() {
       })
     }
   }
-  return { map, seeds };
+  return { map, seeds, seedsPartII };
 }
 
 function findFinalLocation() {
-  const { map, seeds } = parseInputs();
+  const { map, seeds, seedsPartII } = parseInputs();
   const seedMap = seeds.map((seed) => goThroughMappings(seed, map));
   const min = Math.min(...seedMap.map((path) => path.location));
   console.log('Closest location for Part I is: ' + min);
@@ -84,6 +90,10 @@ function findPosition(resourceValue, resourceName, map) {
 
 function withinRange(range, value) {
   return value >= range[0] && value <= range[1];
+}
+
+function rangeWithinRange(range1, range2) {
+  return range1[0] >= range2[0] && range1[1] <= range2[1];
 }
 
 function isStartOfMap(currentLine) {
