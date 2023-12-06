@@ -1,6 +1,6 @@
 const fs = require('fs');
 const inputFile = fs.readFileSync(__dirname + '/input').toString('utf8');
-const inputs = inputFile.split('\n');
+const inputs = inputFile.split((/\r\n|\r|\n/));
 
 const resourceList = [ 'seed', 'soil', 'fertilizer', 'water', 'light', 'temperature', 'humidity', 'location' ];
 
@@ -27,6 +27,7 @@ function parseInputs() {
       seeds = seedStrings.trim().split(/\s+/).map((i) => parseInt(i));
       for (let pairIndex=0; pairIndex < seeds.length; pairIndex += 2) {
         if (seeds[pairIndex] && seeds[pairIndex + 1]) {
+          // Add range by adding seeds together
           seedsPartII.push([seeds[pairIndex], seeds[pairIndex] + seeds[pairIndex + 1]]);
         }
       }
@@ -35,7 +36,6 @@ function parseInputs() {
       currentToResource = newFromTo.to;
       map[currentFromResource] = [];
     } else {
-      //564780290
       const [toStart, fromStart, rangeLength] = currentLine.split(/\s+/);
       const toStartInt = parseInt(toStart);
       const fromStartInt = parseInt(fromStart);
@@ -61,7 +61,8 @@ function findFinalLocation() {
 function findFinalRanges() {
   const { map, seedsPartII } = parseInputs();
   const rangeMap = seedsPartII.map((seedRange) => calculateRanges(seedRange, map));
-  console.log('Data for Part II is: ' + rangeMap);
+  const min = Math.min(...rangeMap.map(({ location }) => location.flat()).flat())
+  console.log('Minimum data for Part II is: ' + min);
 }
 
 function calculateRanges(startingRange, map) {
@@ -69,10 +70,14 @@ function calculateRanges(startingRange, map) {
     'seed': [startingRange]
   };
   let currentResource = 'seed';
-  while (currentResource) {
-    const nextResource = resourceList?.[resourceList.findIndex((val) => val === currentFromResource) + 1];
+  while (currentResource !== 'location') {
+    const nextResource = resourceList?.[resourceList.findIndex((val) => val === currentResource) + 1];
+    // Go through current ranges you know you can get to and expand the next list of ranges you can get to from that, to get full list of 
+    // ranges you can traverse.
     for (const currentRange of finalRanges[currentResource]) {
-      const overlappingRanges = map[currentResource].filter(({ fromRange, toRange }) => hasAnyRangeOverlap(currentRange, fromRange));
+      // get overlapping ranges with the current range
+      const overlappingRanges = map[currentResource].filter(({ fromRange }) => hasAnyRangeOverlap(currentRange, fromRange));
+      // Using overlaps, create the new ranges that can be gotten at the next resource with that.
       const toRanges = createNewToRanges(currentRange, overlappingRanges);
       if (!finalRanges[nextResource]) {
         finalRanges[nextResource] = [];
@@ -82,15 +87,52 @@ function calculateRanges(startingRange, map) {
     // go to next resource, undefined if go to final resource
     currentResource = nextResource
   }
+  return finalRanges;
 }
 
-function createNewToRanges(currentRange, overlappingWithCurrentRange) {
-  const newRangeObject = {
-    fromRange: currentRange,
-    toRange: currentRange,
-    difference: 0
-  };
-  // TODO finish this function
+function createNewToRanges(currentRange, anyOverlaps) {
+  const [currentRangeStart, currentRangeEnd] = currentRange;
+
+  const newRanges = [];
+  // Fix the bounds of the overlaps to be within range of the current range
+  for (let i = 0; i < anyOverlaps.length; i++) {
+    const overlapObj = anyOverlaps[i];
+    const [overlapStart, overlapEnd] = overlapObj.fromRange;
+    const newRangeObj = {};
+    newRangeObj.fromRange = [overlapStart, overlapEnd];
+    newRangeObj.difference = overlapObj.difference;
+    if (overlapStart < currentRangeStart) {
+      newRangeObj.fromRange[0] = currentRangeStart;
+    } 
+    if (overlapEnd > currentRangeEnd) {
+      newRangeObj.fromRange[1] = currentRangeEnd;
+    }
+    newRanges.push(newRangeObj);
+  }
+  // sort ranges to be in order
+  newRanges.sort(({ fromRange: [a, b ]}, {fromRange: [c, d]}) => (a + b) - (c + d));
+
+  // Add in ranges that just go 1 -> for the cases where the overlaps didn't fill it in
+  for (let j = 0; j < newRanges.length; j++) {
+    const current = newRanges[j].fromRange;
+    const next = newRanges?.[j + 1]?.fromRange;
+    if (next && current[1] !== next[0]) {
+      newRanges.splice(j + 1, 0, { difference: 0, fromRange: [current[1], next[0]]});
+    }
+  }
+
+  // If no new ranges at all, copy the current range over with overlap of 0
+  if (newRanges.length === 0) {
+    newRanges.push({ fromRange: [currentRangeStart, currentRangeEnd], difference: 0});
+  }
+
+  // Create the new toRange.
+  const toRanges = newRanges.map(({ fromRange, difference}) => {
+    return [fromRange[0] + difference, fromRange[1] + difference]
+  });
+
+
+  return toRanges;
 }
 
 function goThroughMappings(seed, map) {
@@ -128,9 +170,9 @@ function withinRange(range, value) {
 }
 
 function hasAnyRangeOverlap(range1, range2) {
-  // Range 1 ends before Range 2 starts or Range 1 starts after range2 ends
+  // No overlap = Range 1 ends before or at the time Range 2 starts OR Range 1 starts after range2 ends
   // Negate that to get overlap
-  return !(range1[1] < range2[0] || range1[0] > range2[1])
+  return !(range1[1] <= range2[0] || range1[0] > range2[1])
 }
 
 function isStartOfMap(currentLine) {
@@ -142,3 +184,4 @@ function isStartOfMap(currentLine) {
 }
 
 findFinalLocation();
+findFinalRanges();
