@@ -19,19 +19,26 @@ function parseInput() {
         const raceLength = raceLengthNums[i];
         const record = recordNums[i];
         const winningNums = findWinningNums(raceLength, record);
-        finalRaces.push({ raceLength, record, winningNums });
+        const winningNumsQuad = winningAmountQuadratic(raceLength, record);
+        finalRaces.push({ raceLength, record, amountWinning: winningNums.length, amountWinQuad: winningNumsQuad});
     }
 
-    const finalAmt = finalRaces.reduce((accAmt, { winningNums }) => {
-        return accAmt * winningNums.length;
+    const finalAmt = finalRaces.reduce((accAmt, { amountWinning }) => {
+        return accAmt * amountWinning;
     }, 1);
 
-    const winningNumsPartII = findWinningNums(partIIRaceLength, partIIRecord);
+    const finalAmtQuad = finalRaces.reduce((accAmt, { amountWinQuad }) => {
+        return accAmt * amountWinQuad;
+    }, 1);
 
-    console.log('Total for part I is: '  + finalAmt);
-    console.log('Total for part II is: ' + winningNumsPartII.length);
+    const winningNumsPartII = winningAmountQuadratic(partIIRaceLength, partIIRecord);
+
+    console.log('Total for part I without quadratic is: ' + finalAmt);
+    console.log('Total for part I with quadratic is: ' + finalAmtQuad);
+    console.log('Total for part II is: ' + winningNumsPartII);
 }
 
+// boring brute force way
 function findWinningNums(raceLength, record) {
     const winningNums = [];
     for (let i = 1; i < raceLength; i++) {
@@ -41,6 +48,25 @@ function findWinningNums(raceLength, record) {
         }
     }
     return winningNums;
+}
+
+// fun math way
+function winningAmountQuadratic(raceLength, record) {
+    // quadratic formula derived from distance = (holdTime)(raceLength - holdtime)
+    // this expands to -holdtime^2 - raceLength(holdtime).
+    // Solutions that are at least the record are -holdtime^2 + raceLength(holdtime) - record = 0
+    // This give us quadratic formula to solve -1x^2 + raceLength(x) - record = 0
+    // Solving for the 2 roots and subtracting them gives us the amount of x-axis (i.e holds) that are greater
+    // than the range
+    const a = -1;
+    const b = raceLength;
+    const c = -record;
+
+    // quadratic formula roots
+    const firstRoot = (-b + Math.sqrt(Math.pow(b, 2) - (4 * a * c))) / (2 * a);
+    const secondRoot = (-b - Math.sqrt(Math.pow(b, 2) - (4 * a * c))) / (2 * a);
+
+    return Math.abs(Math.ceil(firstRoot) - Math.ceil(secondRoot));
 }
 
 parseInput();
