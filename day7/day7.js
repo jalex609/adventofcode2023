@@ -71,14 +71,17 @@ function parseHand(handStr, bid) {
             if (key === 'J') {
                 return acc;
             }
-            if (value >= acc.max && valueMap[key] > valueMap[acc.letter]) {
+            if (value >= acc.max) {
                 return { max: value, letter: key }
             } else {
                 return acc;
             }
         }, {max: 0, letter: 'Joker'});
-        amtEachCardPtII[entryToAdd.letter] += amtEachCardPtII['J'];
-        delete amtEachCardPtII.J;
+        // if not all jokers, add the jokers amount to highest other amount and delete joker
+        if (!(entryToAdd.letter === 'Joker' || entryToAdd.letter === 'J')) {
+            amtEachCardPtII[entryToAdd.letter] += amtEachCardPtII['J'];
+            delete amtEachCardPtII.J;
+        }
     }
 
     addToCardArray(finalCardArray, amountOfEachCard, lexString, bid);
