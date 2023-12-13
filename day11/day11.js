@@ -68,26 +68,26 @@ function expandRowsAndColumns(inputs) {
 function findGalaxies(newArr, expansionFactor=2, markedRows, markedColumns) {
   const galaxyList = [];
   let pairSum = 0;
-  let rowsMarked = new Set();
+  let rowsMarked = 0;
   for (let rowIdx = 0; rowIdx < newArr.length; rowIdx++) {
-    let columnsMarked = new Set(); // checking columns out, new set every time.
+    let columnsMarked = 0; // checking columns out, new set every time.
     for (let colIdx = 0; colIdx < newArr[0].length; colIdx++) {
       if (newArr[rowIdx][colIdx] === '#') {
         const newXY = [
-          colIdx + (columnsMarked.size * expansionFactor - columnsMarked.size), // column + number of expanded galaxies passed over - its size to keep index correct
-          rowIdx + (rowsMarked.size * expansionFactor - rowsMarked.size) // rows + number of expanded galaxies passed over - its size to keep index correct
+          colIdx + (columnsMarked * expansionFactor - columnsMarked), // column + number of expanded galaxies passed over - its size to keep index correct
+          rowIdx + (rowsMarked * expansionFactor - rowsMarked) // rows + number of expanded galaxies passed over - its size to keep index correct
         ];
         for (const galaxy of galaxyList) {
           pairSum += manhattanDistance(galaxy, newXY);
         }
         galaxyList.push(newXY); // x, y coordinate, column is x
       }
-      if (markedRows.has(rowIdx)) {
-        rowsMarked.add(rowIdx);
-      }
       if (markedColumns.has(colIdx)) {
-        columnsMarked.add(colIdx);
+        columnsMarked += 1;
       }
+    }
+    if (markedRows.has(rowIdx)) {
+      rowsMarked += 1;
     }
   }
 
