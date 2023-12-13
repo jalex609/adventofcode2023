@@ -2,19 +2,115 @@ const fs = require('fs');
 const inputFile = fs.readFileSync(__dirname + '/inputSqueeze').toString('utf8');
 const inputs = inputFile.split((/\r\n|\r|\n/));
 
-function parseInputs() {
-  return inputs.reduce((finalMap, input, rowIdx) => {
+function parseInputs(inputArr=null) {
+  inputArr = inputArr ?? inputs;
+  const pipeMap =  inputArr.reduce((finalMap, input, rowIdx) => {
     input.split('').forEach((char, colIdx) => {
-      parsePipeChar(char, rowIdx, colIdx, input.length - 1, inputs.length - 1, finalMap);
+      parsePipeChar(char, rowIdx, colIdx, input.length - 1, inputArr.length - 1, finalMap);
     });
     return finalMap;
   }, {});
+
+  return { pipeMap, rows: inputArr.length, columns: inputArr[0].length };
+
 }
 
 function findCycleDistanceAndEnclosed() {
-  const pipeMap = parseInputs();
+  const { pipeMap, rows, columns } = parseInputs();
   console.log('Answer for part I is: ' + findCycles(pipeMap));
-  console.log('Answer for part II is: ' + findEnclosedTiles(pipeMap));
+  console.log('Answer for part II is: ' + doubleGraph(rows, columns, pipeMap));
+}
+
+function doubleGraph(rows, columns, pipeMap) {
+  const expandedTiles = new Set();
+  const nonCycleTiles = Object.keys(pipeMap).filter((pos) => {
+    return pipeMap[pos]?.visited === undefined;
+  });
+  const strMap = inputs.map((i) => i.split(''));
+  for (let i = 0; i < nonCycleTiles.length; i++) {
+    const [row, col] = nonCycleTiles[i].split(',');
+    strMap[parseInt(row)][parseInt(col)] = '.';
+  }
+  const newArray = [];
+  for(let i = 0; i < rows * 2; i++) {
+    newArray.push(new Array(columns * 2));
+  }
+
+  // create 2x2 version of original grid to fix "squeezing"
+  for (let rowIdx = 0; rowIdx < rows; rowIdx++) {
+    newArray.forEach((line) => {
+      console.log(line.join(''));
+    });
+    for (let colIdx = 0; colIdx < columns; colIdx++) {
+      const currOriginal = strMap[rowIdx][colIdx];
+      const expandPipeResult = expandPipe(currOriginal);
+
+      for (let expRowIdx = 0; expRowIdx < expandPipeResult.length; expRowIdx++) {
+        const colLength = expandPipeResult[expRowIdx].length;
+        for (let expColIdx = 0; expColIdx < colLength; expColIdx++) {
+          const expandedMapRow = rowIdx * 2 + expRowIdx; // double the row + wherever we are in the 2x2 returned
+          const expandedMapCol = colIdx * 2 + expColIdx;
+          newArray[expandedMapRow][expandedMapCol] = expandPipeResult[expRowIdx][expColIdx];
+          // only the 0,0 tile is original, otherwise it is an "expanded" tile and shouldn't be counted in final count
+          if (expRowIdx !== 0 || expColIdx !== 0) {
+            expandedTiles.add(expandedMapRow + ',' + expandedMapCol);
+          }
+        }
+      }
+    }
+  }
+
+  // parseIntoMap
+  const { pipeMap: pipeMapDoubled } = parseInputs(newArray.map((row) => row.join('')));
+  findCycles(pipeMapDoubled); // find the doubled cycle
+  return findEnclosedTiles(pipeMapDoubled, expandedTiles); // find the enclosed tiles, ignoring the expanded
+}
+
+function expandPipe(org) {
+  if (org === '.') {
+    return [
+      ['.', '.'],
+      ['.', '.']
+    ];
+  } else if (org === '|') {
+    return [
+      ['|', '.'],
+      ['|', '.']
+    ]
+  } else if (org === '-') {
+    return [
+      ['-', '-'],
+      ['.', '.']
+    ]
+  } else if (org === 'L') {
+    return [
+      ['L', '-'],
+      ['.', '.']
+    ]
+  } else if (org === 'J') {
+    return [
+      ['J', '.'],
+      ['.', '.']
+    ]
+  } else if (org === '7') {
+    return [
+      ['7', '.'],
+      ['|', '.']
+    ]
+  } else if (org === 'F') {
+    return [
+      ['F', '-'],
+      ['|', '.']
+    ]
+  }
+  // bit of a cheat by knowing what "S" looks like, but could find it dynamically if needed
+  else if (org === 'S') {
+    return [
+      ['S', '-'],
+      ['|', '.']
+    ];
+  }
+
 }
 
 function findCycles(pipeMap) {
@@ -100,16 +196,18 @@ function findValidNeighbors(possibleNeighbors, maxColIdx, maxRowIdx) {
   });
 }
 
-function findEnclosedTiles(pipeMap) {
+function findEnclosedTiles(pipeMap, expandedTiles) {
   const nonCycleTiles = Object.keys(pipeMap).filter((pos) => {
     return pipeMap[pos]?.visited === undefined;
   });
 
   let isEnclosedSum = 0;
   for (const nonCyclePos of nonCycleTiles) {
-    const isEnclosed = checkEnclosed(nonCyclePos, pipeMap);
-    if (isEnclosed) {
-      isEnclosedSum += 1;
+    if (!expandedTiles.has(nonCyclePos.toString())) {
+      const isEnclosed = checkEnclosed(nonCyclePos, pipeMap);
+      if (isEnclosed) {
+        isEnclosedSum += 1;
+      }
     }
   }
 
@@ -128,11 +226,10 @@ function checkEnclosed(pos, pipeMap) {
     }
     // up, down, left, right
     const posnsToCheckCandidates = [[rowCurr - 1, colCurr], [rowCurr + 1, colCurr], [rowCurr, colCurr - 1], [rowCurr, colCurr + 1]];
-    const finalCandidates = posnsToCheckCandidates.filter((pos, i) => {
-      const notPartOfCycle = pipeMap?.[pos.toString()]?.visited === undefined;
-      const isPipeSqueezeCheck = isPipeSqueeze(pos, pipeMap, i <= 1);
+    const finalCandidates = posnsToCheckCandidates.filter((pos) => {
+      let notPartOfCycle = pipeMap?.[pos.toString()]?.visited === undefined;
       const alreadyTried = alreadyTraversed.has(pos.toString());
-      return (notPartOfCycle || isPipeSqueezeCheck) && !alreadyTried;
+      return notPartOfCycle && !alreadyTried;
     })
     candidatesToEscape.unshift(...finalCandidates);
     alreadyTraversed.add(rowCurr + ',' + colCurr);
@@ -140,35 +237,5 @@ function checkEnclosed(pos, pipeMap) {
   return true;
 }
 
-
-function isPipeSqueeze(newPosn, pipeMap, isVertical) {
-  const [nextRow, nextCol] = newPosn;
-  if (pipeMap?.[newPosn.toString()]?.visited) {
-    const atPosn = pipeMap[newPosn];
-    // up, down, left, right
-    const posnsToCheckCandidates = [[nextRow - 1, nextCol], [nextRow + 1, nextCol], [nextRow, nextCol - 1], [nextRow, nextCol + 1]];
-    const [up, down, left, right] = posnsToCheckCandidates;
-    const [upEntry, downEntry, leftEntry, rightEntry] = posnsToCheckCandidates.map((p) => pipeMap?.[p.toString()]);
-
-    if (isVertical) {
-      // if right entry is not neighbors with left and left not with right
-      if (rightEntry?.visited && Math.abs(atPosn.distanceFromStart - rightEntry?.distanceFromStart) > 1 ||
-        leftEntry?.visited && Math.abs(atPosn.distanceFromStart - leftEntry?.distanceFromStart) > 1) {
-        return true;
-      }
-
-    } else {
-      if (upEntry?.visited && Math.abs(atPosn.distanceFromStart - upEntry?.distanceFromStart) > 1 ||
-        downEntry?.visited && Math.abs(atPosn.distanceFromStart - downEntry?.distanceFromStart) > 1) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function checkSqueezeNeighbors(isVertical, ) {
-  right
-}
 
 findCycleDistanceAndEnclosed();
